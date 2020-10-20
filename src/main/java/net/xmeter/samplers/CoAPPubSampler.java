@@ -9,15 +9,22 @@ import org.eclipse.californium.core.coap.MediaTypeRegistry;
 import org.eclipse.californium.core.coap.Request;
 import org.eclipse.leshan.client.californium.LeshanClient;
 import org.eclipse.leshan.client.californium.LeshanClientBuilder;
+import org.eclipse.leshan.client.engine.DefaultRegistrationEngineFactory;
 import org.eclipse.leshan.client.object.Device;
 import org.eclipse.leshan.client.object.Security;
 import org.eclipse.leshan.client.object.Server;
+import org.eclipse.leshan.client.observer.LwM2mClientObserverAdapter;
 import org.eclipse.leshan.client.resource.BaseInstanceEnabler;
 import org.eclipse.leshan.client.resource.ObjectsInitializer;
 import org.eclipse.leshan.client.servers.ServerIdentity;
 import org.eclipse.leshan.core.LwM2mId;
+import org.eclipse.leshan.core.model.LwM2mModel;
+import org.eclipse.leshan.core.model.ObjectLoader;
+import org.eclipse.leshan.core.model.ObjectModel;
+import org.eclipse.leshan.core.model.StaticModel;
 import org.eclipse.leshan.core.node.LwM2mResource;
 import org.eclipse.leshan.core.request.BindingMode;
+import org.eclipse.leshan.core.request.RegisterRequest;
 import org.eclipse.leshan.core.response.ExecuteResponse;
 import org.eclipse.leshan.core.response.ReadResponse;
 import org.eclipse.leshan.core.response.WriteResponse;
@@ -26,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.xml.bind.DatatypeConverter;
 import java.text.MessageFormat;
+import java.util.List;
 
 public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListener {
     private static final long serialVersionUID = -4312341622759500786L;
@@ -38,6 +46,7 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
     private Request request;
     private String query;
     private LeshanClientBuilder builder;
+    private SampleResult result;
 
     public String getMethodType() {
         return getPropertyAsString(METHOD_TYPE, DEFAULT_PUB_METHOD_TYPE);
@@ -81,7 +90,7 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
 
     @Override
     public SampleResult sample(Entry arg0) {
-        SampleResult result = new SampleResult();
+        result = new SampleResult();
         try {
             uri = "coap://" + getServer() + ":" + getPort();
             logger.info(uri);
@@ -99,24 +108,43 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
 
             result.setResponseData(uri, "UTF-8");
 
-           new Thread(new Runnable() {
-               @Override
-               public void run() {
-                   String endpoint = getEndpoint();
-                   builder = new LeshanClientBuilder(endpoint);
+            String endpoint = getEndpoint();
+            builder = new LeshanClientBuilder(endpoint);
+            List<ObjectModel> models = ObjectLoader.loadDefault();
 
-                   ObjectsInitializer initializer = new ObjectsInitializer();
-                   initializer.setInstancesForObject(LwM2mId.SECURITY, Security.noSec(uri, 12345));
-                   initializer.setInstancesForObject(LwM2mId.SERVER, new Server(12345, Long.parseLong(getLifeTime()), BindingMode.U, false));
-                   initializer.setInstancesForObject(LwM2mId.DEVICE, new Device("Eclipse Leshan", "model12345", "12345", "U"));
-                   initializer.setInstancesForObject(LwM2mId.CONNECTIVITY_STATISTICS, new ConnectivityStatistics());
-                   builder.setObjects(initializer.createAll());
-                   LeshanClient client = builder.build();
-                   client.start();
-               }
-           }).start();
-            result.setSuccessful(true);
-            result.setResponseCodeOK();
+            final LwM2mModel model = new StaticModel(models);
+            final ObjectsInitializer initializer = new ObjectsInitializer(model);
+            initializer.setInstancesForObject(LwM2mId.SECURITY, Security.noSec(uri, 12345));
+            initializer.setInstancesForObject(LwM2mId.SERVER, new Server(12345, Long.parseLong(getLifeTime()), BindingMode.U, false));
+            initializer.setInstancesForObject(LwM2mId.DEVICE, new Device("Eclipse Leshan", "model12345", "12345", "U"));
+//            initializer.setInstancesForObject(LwM2mId.CONNECTIVITY_STATISTICS, new ConnectivityStatistics());
+            builder.setObjects(initializer.createAll());
+
+            DefaultRegistrationEngineFactory engineFactory = new DefaultRegistrationEngineFactory();
+            engineFactory.setCommunicationPeriod(30000);
+            engineFactory.setReconnectOnUpdate(true);
+            engineFactory.setResumeOnConnect(false);
+
+            final LeshanClient client = builder.build();
+            client.addObserver(new LwM2mClientObserverAdapter(){
+                @Override
+                public void onRegistrationStarted(ServerIdentity server, RegisterRequest request) {
+                    super.onRegistrationStarted(server, request);
+                    result.setResponseMessage(MessageFormat.format("Publish failed to topic {0}.", getResourcePath()));
+                }
+
+                @Override
+                public void onRegistrationSuccess(ServerIdentity server, RegisterRequest request, String registrationID) {
+                    super.onRegistrationSuccess(server, request, registrationID);
+                    result.setResponseMessage("register success.");
+                    client.stop(true);
+                    result.setSuccessful(true);
+                    result.setResponseMessage("onRegistrationSuccess");
+                    result.setResponseCodeOK();
+                    result.sampleEnd();
+                }
+            });
+            client.start();
         }
         catch (Exception e) {
             //logger.log(Priority.ERROR, e.getMessage(), e);
@@ -134,13 +162,13 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
 
     @Override
     public void threadStarted() {
-        //System.out.println("thread Started!!!");
+        System.out.println("thread Started!!!");
 
     }
 
     @Override
     public void threadFinished() {
-        //System.out.println("Pub thread Finished!!!");
+        System.out.println("Pub thread Finished!!!");
     }
 
     public class ConnectivityStatistics extends BaseInstanceEnabler {
@@ -149,6 +177,8 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
         public ReadResponse read(ServerIdentity identity, int resourceid) {
             switch (resourceid) {
                 case 0:
+                    result.setSuccessful(true);
+                    result.setResponseCode("200");
                     return ReadResponse.success(resourceid, "OK");
             }
             return ReadResponse.notFound();

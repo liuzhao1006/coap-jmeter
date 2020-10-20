@@ -8,6 +8,7 @@ import javax.swing.JPanel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import net.xmeter.config.CoapConfig;
 import org.apache.jmeter.gui.util.HorizontalPanel;
 import org.apache.jmeter.gui.util.JSyntaxTextArea;
 import org.apache.jmeter.gui.util.JTextScrollPane;
@@ -116,7 +117,7 @@ public class CoAPPubSamplerUI extends AbstractSamplerGui implements CoAPConstant
 
     @Override
     public String getStaticLabel() {
-        return "SYD CoAP Pub Sampler";
+        return CoapConfig.UI_TITLE;
     }
 
     @Override

@@ -37,19 +37,23 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
 
     private JLabeledChoice protocols;
 
-    private JCheckBox dualAuth = new JCheckBox("Dual SSL authentication");
+    private JCheckBox dualAuth = new JCheckBox("ECC authentication");
 
-    private final JLabeledTextField certificationFilePath1 = new JLabeledTextField("Trust Key Store(*.jks):       ", 25);
-    private final JLabeledTextField certificationFilePath2 = new JLabeledTextField("Client Certification(*.p12):", 25);
-    
+    private final JLabeledTextField certificationFilePath1 = new JLabeledTextField("CA Certification(*.crt):      ", 25);
+    private final JLabeledTextField certificationFilePath2 = new JLabeledTextField("Client Certification(*.crt):  ", 25);
+    private final JLabeledTextField certificationFilePath3 = new JLabeledTextField("Client Key(*.der):              ", 25);
+
     private final JLabeledTextField tksPassword = new JLabeledTextField("Secret:", 10);
     private final JLabeledTextField cksPassword = new JLabeledTextField("Secret:", 10);
+    private final JLabeledTextField cAPassword = new JLabeledTextField("Secret:", 10);
 
     private JButton browse1;
     private JButton browse2;
+    private JButton browse3;
     private static final String BROWSE1 = "browse1";
     private static final String BROWSE2 = "browse2";
-    
+    private static final String BROWSE3 = "browse3";
+
     public final JLabeledTextField clientIdPrefix = new JLabeledTextField("Client ID:", 8);
     private JCheckBox clientIdSuffix = new JCheckBox("Add random suffix for Client ID");
     
@@ -96,13 +100,13 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         
         JPanel pPanel = new HorizontalPanel();
 
-        protocols = new JLabeledChoice("Protocols:", new String[] { "UDP", "SSL" }, true, false);
+        protocols = new JLabeledChoice("Protocols:", new String[] { "UDP + DTLS", "UDP" }, true, false);
         protocols.addChangeListener(this);
         pPanel.add(protocols, BorderLayout.WEST);
 
-        dualAuth.setSelected(false);
+        dualAuth.setSelected(true);
         dualAuth.setFont(null);
-        dualAuth.setVisible(false);
+        dualAuth.setVisible(true);
         dualAuth.addChangeListener(this);
         pPanel.add(dualAuth, BorderLayout.CENTER);
 
@@ -114,12 +118,12 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         c.gridy = 0;
         c.gridwidth = 2;
         panel.add(certificationFilePath1, c);
-        certificationFilePath1.setVisible(false);
+        certificationFilePath1.setVisible(true);
 
         browse1 = new JButton(JMeterUtils.getResString("browse"));
         browse1.setActionCommand(BROWSE1);
         browse1.addActionListener(this);
-        browse1.setVisible(false);
+        browse1.setVisible(true);
         
         c.gridx = 2;
         c.gridy = 0;
@@ -154,6 +158,30 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         c.gridy = 1;
         panel.add(cksPassword, c);
         cksPassword.setVisible(false);
+
+        certificationFilePath3.setVisible(false);
+
+
+        //c.weightx = 0.0;
+        c.gridx = 0;
+        c.gridy = 2;
+        c.gridwidth = 2;
+        panel.add(certificationFilePath3, c);
+
+        browse3 = new JButton(JMeterUtils.getResString("browse"));
+        browse3.setActionCommand(BROWSE3);
+        browse3.addActionListener(this);
+        browse3.setVisible(false);
+
+        c.gridx = 2;
+        c.gridy = 2;
+        c.gridwidth = 1;
+        panel.add(browse3, c);
+
+        c.gridx = 3;
+        c.gridy = 2;
+        panel.add(cAPassword, c);
+        cAPassword.setVisible(false);
         
         protocolPanel.add(pPanel);
         protocolPanel.add(panel);
@@ -190,23 +218,29 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
             if(dualAuth.isSelected()) {
                 certificationFilePath1.setVisible(true);
                 certificationFilePath2.setVisible(true);
-                tksPassword.setVisible(true);
-                cksPassword.setVisible(true);
+                certificationFilePath3.setVisible(true);
+                tksPassword.setVisible(false);
+                cksPassword.setVisible(false);
+                cAPassword.setVisible(false);
                 browse1.setVisible(true);
                 browse2.setVisible(true);
+                browse3.setVisible(true);
             } else {
                 certificationFilePath1.setVisible(false);
                 certificationFilePath2.setVisible(false);
+                certificationFilePath3.setVisible(false);
                 tksPassword.setVisible(false);
                 cksPassword.setVisible(false);
+                cAPassword.setVisible(false);
                 browse1.setVisible(false);
                 browse2.setVisible(false);
+                browse3.setVisible(false);
             }
         } else if(e.getSource() == protocols) {
             if("UDP".equals(protocols.getText())) {
                 dualAuth.setVisible(false);
                 dualAuth.setSelected(false);
-            } else if("SSL".equals(protocols.getText())) {
+            } else if("UDP + DTLS".equals(protocols.getText())) {
                 dualAuth.setVisible(true);
                 dualAuth.setEnabled(true);
             }
@@ -244,8 +278,9 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         } else {
             clientIdSuffix.setSelected(false);
         }
-        cksPassword.setText(sampler.getKeyStorePassword());
-        tksPassword.setText(sampler.getClientCertPassword());
+//        cksPassword.setText(sampler.getKeyStorePassword());
+//        cAPassword.setText(sampler.getKeyStorePassword());
+      //  tksPassword.setText(sampler.getClientCertPassword());
         userNameAuth.setText(sampler.getUserNameAuth());
         passwordAuth.setText(sampler.getPasswordAuth());
     }
@@ -261,8 +296,9 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         sampler.setDualSSLAuth(dualAuth.isSelected());
         sampler.setKeyStoreFilePath(certificationFilePath1.getText());
         sampler.setClientCertFilePath(certificationFilePath2.getText());
-        sampler.setKeyStorePassword(cksPassword.getText());
-        sampler.setClientCertPassword(tksPassword.getText());
+//        sampler.setKeyStorePassword(cksPassword.getText());
+//        sampler.setKeyStorePassword(cAPassword.getText());
+       // sampler.setClientCertPassword(tksPassword.getText());
         sampler.setClienIdPrefix(clientIdPrefix.getText());
         sampler.setClientIdSuffix(clientIdSuffix.isSelected());
         sampler.setUserNameAuth(userNameAuth.getText());
@@ -283,6 +319,7 @@ public class CoAPCommonUI  implements ChangeListener, ActionListener, CoAPConsta
         clientIdPrefix.setText(DEFAULT_CONN_PREFIX);
         protocols.setSelectedIndex(0);
         cksPassword.setText("");
+        cAPassword.setText("");
         serverAddr.setText(DEFAULT_SERVER);
         serverPort.setText(DEFAULT_PORT);
         //timeout.setText(DEFAULT_CONN_TIME_OUT);
