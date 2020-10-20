@@ -97,7 +97,7 @@ public class CoAPPubSamplerUI extends AbstractSamplerGui implements CoAPConstant
         
         JPanel horizon1 = new HorizontalPanel();
         payloadTypes = new JLabeledChoice("Message type:", new String[] { PAYLOAD_TYPE_STRING, PAYLOAD_TYPE_HEX_STRING, PAYLOAD_TYPE_RANDOM_STR_WITH_FIX_LEN }, false, false);
-        payloadTypes.addChangeListener(this);
+//        payloadTypes.addChangeListener(this);
         payloadTypes.setSelectedIndex(0);
         
         horizon1.add(payloadTypes, BorderLayout.WEST);
@@ -163,12 +163,12 @@ public class CoAPPubSamplerUI extends AbstractSamplerGui implements CoAPConstant
         
         this.timestamp.setSelected(sampler.isAddTimestamp());
         if(PAYLOAD_TYPE_STRING.equalsIgnoreCase(sampler.getPayloadType())) {
-            this.payloadTypes.setSelectedIndex(0);  
+            this.payloadTypes.setSelectedIndex(0);
             this.payloadPanel.setVisible(true);
-        } else if(PAYLOAD_TYPE_HEX_STRING.equalsIgnoreCase(sampler.getPayloadType())) {
-            this.payloadTypes.setSelectedIndex(1);
-        } else if(PAYLOAD_TYPE_RANDOM_STR_WITH_FIX_LEN.equalsIgnoreCase(sampler.getPayloadType())) {
-            this.payloadTypes.setSelectedIndex(2);
+//        } else if(PAYLOAD_TYPE_HEX_STRING.equalsIgnoreCase(sampler.getPayloadType())) {
+////            this.payloadTypes.setSelectedIndex(1);
+//        } else if(PAYLOAD_TYPE_RANDOM_STR_WITH_FIX_LEN.equalsIgnoreCase(sampler.getPayloadType())) {
+////            this.payloadTypes.setSelectedIndex(2);
         }
         
         stringLength.setText(String.valueOf(sampler.getPayloadLength()));
@@ -210,7 +210,7 @@ public class CoAPPubSamplerUI extends AbstractSamplerGui implements CoAPConstant
         this.resourcePath.setText(DEFAULT_RESPURCE_PATH);
         
         this.timestamp.setSelected(false);      
-        this.payloadTypes.setSelectedIndex(2);
+        this.payloadTypes.setSelectedIndex(0);
         this.stringLength.setText(String.valueOf(DEFAULT_PAYLOAD_FIX_LENGTH));
         this.payloadTypes.setText("");
     }
