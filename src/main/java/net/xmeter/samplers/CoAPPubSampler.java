@@ -25,6 +25,7 @@ import org.eclipse.leshan.core.model.StaticModel;
 import org.eclipse.leshan.core.node.LwM2mResource;
 import org.eclipse.leshan.core.request.BindingMode;
 import org.eclipse.leshan.core.request.RegisterRequest;
+import org.eclipse.leshan.core.request.UpdateRequest;
 import org.eclipse.leshan.core.response.ExecuteResponse;
 import org.eclipse.leshan.core.response.ReadResponse;
 import org.eclipse.leshan.core.response.WriteResponse;
@@ -47,6 +48,8 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
     private String query;
     private LeshanClientBuilder builder;
     private SampleResult result;
+
+    private final Object LOCK = new Object();
 
     public String getMethodType() {
         return getPropertyAsString(METHOD_TYPE, DEFAULT_PUB_METHOD_TYPE);
@@ -91,10 +94,11 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
     @Override
     public SampleResult sample(Entry arg0) {
         result = new SampleResult();
+
         try {
             uri = "coap://" + getServer() + ":" + getPort();
             logger.info(uri);
-            if(DEFAULT_PUB_METHOD_TYPE.equals(getMethodType())) {
+            if (DEFAULT_PUB_METHOD_TYPE.equals(getMethodType())) {
                 request = Request.newPut();
             } else {
                 request = Request.newPost();
@@ -103,50 +107,81 @@ public class CoAPPubSampler extends AbstractCoAPSampler implements ThreadListene
             request.setURI(uri);
 
             result.setSampleLabel(getName());
-            
+
             result.sampleStart();
 
             result.setResponseData(uri, "UTF-8");
 
             String endpoint = getEndpoint();
-            builder = new LeshanClientBuilder(endpoint);
-            List<ObjectModel> models = ObjectLoader.loadDefault();
+            synchronized (LOCK) {
+                builder = new LeshanClientBuilder(endpoint);
+                List<ObjectModel> models = ObjectLoader.loadDefault();
 
-            final LwM2mModel model = new StaticModel(models);
-            final ObjectsInitializer initializer = new ObjectsInitializer(model);
-            initializer.setInstancesForObject(LwM2mId.SECURITY, Security.noSec(uri, 12345));
-            initializer.setInstancesForObject(LwM2mId.SERVER, new Server(12345, Long.parseLong(getLifeTime()), BindingMode.U, false));
-            initializer.setInstancesForObject(LwM2mId.DEVICE, new Device("Eclipse Leshan", "model12345", "12345", "U"));
+                final LwM2mModel model = new StaticModel(models);
+                final ObjectsInitializer initializer = new ObjectsInitializer(model);
+                initializer.setInstancesForObject(LwM2mId.SECURITY, Security.noSec(uri, 12345));
+                initializer.setInstancesForObject(LwM2mId.SERVER, new Server(12345, Long.parseLong(getLifeTime()), BindingMode.U, false));
+                initializer.setInstancesForObject(LwM2mId.DEVICE, new Device("Eclipse Leshan", "model12345", "12345", "U"));
 //            initializer.setInstancesForObject(LwM2mId.CONNECTIVITY_STATISTICS, new ConnectivityStatistics());
-            builder.setObjects(initializer.createAll());
+                builder.setObjects(initializer.createAll());
 
-            DefaultRegistrationEngineFactory engineFactory = new DefaultRegistrationEngineFactory();
-            engineFactory.setCommunicationPeriod(30000);
-            engineFactory.setReconnectOnUpdate(true);
-            engineFactory.setResumeOnConnect(false);
+                DefaultRegistrationEngineFactory engineFactory = new DefaultRegistrationEngineFactory();
+                engineFactory.setCommunicationPeriod(30000);
+                engineFactory.setReconnectOnUpdate(true);
+                engineFactory.setResumeOnConnect(false);
 
-            final LeshanClient client = builder.build();
-            client.addObserver(new LwM2mClientObserverAdapter(){
-                @Override
-                public void onRegistrationStarted(ServerIdentity server, RegisterRequest request) {
-                    super.onRegistrationStarted(server, request);
-                    result.setResponseMessage(MessageFormat.format("Publish failed to topic {0}.", getResourcePath()));
+                final LeshanClient client = builder.build();
+                client.addObserver(new LwM2mClientObserverAdapter() {
+                    @Override
+                    public void onRegistrationStarted(ServerIdentity server, RegisterRequest request) {
+                        super.onRegistrationStarted(server, request);
+//                    result.setResponseMessage(MessageFormat.format("Publish failed to topic {0}.", getResourcePath()));
+                    }
+
+                    @Override
+                    public void onRegistrationSuccess(ServerIdentity server, RegisterRequest request, String registrationID) {
+                        super.onRegistrationSuccess(server, request, registrationID);
+                        logger.info("onRegistrationSuccess");
+//                    result.setResponseMessage("register success.");
+//                    client.stop(true);
+//                    result.setSuccessful(true);
+//                    result.setResponseMessage("onRegistrationSuccess");
+//                    result.setResponseCodeOK();
+//                    result.sampleEnd();
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        synchronized (LOCK) {
+                            logger.info("onRegistrationSuccess sleep " + Thread.currentThread().getName());
+                            LOCK.notifyAll();
+                        }
+                    }
+
+                    @Override
+                    public void onUpdateSuccess(ServerIdentity server, UpdateRequest request) {
+                        super.onUpdateSuccess(server, request);
+                    }
+                });
+                client.start();
+
+                logger.info("start end " + Thread.currentThread().getName());
+                synchronized (LOCK) {
+                    logger.info("end " + Thread.currentThread().getName());
+                    try {
+                        LOCK.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
 
-                @Override
-                public void onRegistrationSuccess(ServerIdentity server, RegisterRequest request, String registrationID) {
-                    super.onRegistrationSuccess(server, request, registrationID);
-                    result.setResponseMessage("register success.");
+                synchronized (LOCK) {
+                    logger.info("stop " + Thread.currentThread().getName());
                     client.stop(true);
-                    result.setSuccessful(true);
-                    result.setResponseMessage("onRegistrationSuccess");
-                    result.setResponseCodeOK();
-                    result.sampleEnd();
                 }
-            });
-            client.start();
-        }
-        catch (Exception e) {
+            }
+        } catch (Exception e) {
             //logger.log(Priority.ERROR, e.getMessage(), e);
             logger.error(e.getMessage(), e);
             result.sampleEnd();
